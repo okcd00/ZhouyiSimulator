@@ -28,7 +28,7 @@ if __name__ == "__main__":
             continue
         
         rank = re.findall('第(.*)卦', title)[0]
-        rank_number, title = f"{chinese_number_to_digit(rank)}", title[4+2+len(rank):]
+        rank_number, title = f"{chinese_number_to_digit(rank):02d}", title[4+2+len(rank):]
         position, title = title[-4:], title[:-4]
         if len(title) == 6:
             name, parts = title[:2], title[2:]
