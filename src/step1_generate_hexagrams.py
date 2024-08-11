@@ -2,12 +2,15 @@
 # ==========================================================================
 #   Copyright (C) since 2024 All rights reserved.
 #
-#   filename : run.py
+#   filename : step1_generate_hexagrams.py
 #   author   : chendian / okcd00@qq.com
-#   date     : 2024/08/12 03:39:54
-#   desc     : 准备做一个带界面可视化的 “蓍草卜卦-天地人-算卦-变爻” 完整模拟过程
-#              考虑方案 Gradio+python / 本地html+js / pyQt5
+#   date     : 2024/08/12 04:00:24
+#   desc     : 算卦第一步“三变生爻，六爻为卦”
+#              (sum%4 in {6老阴,7少阳,8少阴,9老阳}, 2<<6=64, 随机数生成)
 # ==========================================================================
 
 import os, sys, time
 
+
+if __name__ == "__main__":
+    pass
