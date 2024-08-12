@@ -16,7 +16,8 @@ from utils.number_utils import chinese_number_to_digit
 
 
 if __name__ == "__main__":
-    chapters = ''.join(open('references/zhouyi.txt', 'r', encoding='utf8', errors='replace').readlines()).split('\n \n')
+    titles = []
+    chapters = ''.join(open('references/周易全本.txt', 'r', encoding='utf8', errors='replace').readlines()).split('\n \n')
     for i, (title, contents) in enumerate(zip(chapters[::2], chapters[1::2])):
         title = title.strip().replace(' ', '')
         contents = contents.strip()
@@ -38,6 +39,11 @@ if __name__ == "__main__":
             raise ValueError(title)
 
         title = f"{rank_number}_《易經》第{rank}卦_{name}_{parts}_{position}"
+        titles.append(title)
         with open(f'references/{title}', 'w', encoding='utf8') as f:
             # f.write(title + '\n \n')
             f.write(contents)
+
+    with open(f'references/易经标题目录.txt', 'w', encoding='utf8') as f:
+        for title in titles:
+            f.write(title + '\n')
