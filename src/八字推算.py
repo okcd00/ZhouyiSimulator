@@ -7,6 +7,7 @@
 #   date     : 2024/08/19 00:33:26
 #   desc     : 本方案采用当前经纬度进行计算真太阳时，是相对最为准确的推算方法之一
 #              因此，与不包含地理位置的计算方式相比，在时柱部分可能会因偏移有所偏差
+#   reference: https://www.zhihu.com/people/zhang-liang-de-12@张亮德
 # ==========================================================================
 
 import math
@@ -37,33 +38,27 @@ def 获取当前地点的时区偏移() -> float:
 
 
 def 计算本地经纬度的真太阳时(
-        date_local: datetime,
-        observer_latitude: Union[str, float]=39.90000,
-        observer_longitude: Union[str, float]=116.40000) -> datetime:
+        观测日期: datetime,
+        观测纬度: Union[str, float]=39.90000,
+        观测经度: Union[str, float]=116.40000) -> datetime:
     """
     根据观测者的经纬度和时间，计算真太阳时。
 
-    参数：
-    date_local (datetime): 观察时间
-    observer_latitude (str): 观测者的纬度，以度为单位。
-    observer_longitude (str): 观测者的经度，以度为单位。
-
-    返回：
+    返回:
     datetime: 调整后的真太阳时，已考虑观测者的经纬度和时区偏移量。
     """
-    # 根据观测者的经纬度和时间，计算真太阳时:
-    # 计算当前时区偏移time_zone_offset
+    # 计算当前时区偏移 time_zone_offset
     time_zone_offset = 获取当前地点的时区偏移()    
 
     # 将观测者的纬度和经度转换为 ephem 格式
-    lat, lon = ephem.degrees(str(observer_latitude)), ephem.degrees(str(observer_longitude))
+    lat, lon = ephem.degrees(str(观测纬度)), ephem.degrees(str(观测经度))
 
     # 创建一个新的观测者对象
     observer = ephem.Observer()
     observer.lat, observer.lon = lat, lon
 
     # 将输入的当地时间转换为ephem的Date格式
-    date_0 = date_local - timedelta(hours=time_zone_offset)# 将本地时间转换为UTC+0时间
+    date_0 = 观测日期 - timedelta(hours=time_zone_offset)# 将本地时间转换为UTC+0时间
     utc_date = ephem.Date(date_0)
 
     # 设置观测者的日期和时间
@@ -82,177 +77,153 @@ def 计算本地经纬度的真太阳时(
     time_diff = (clock_noon - next_noon).total_seconds() / 3600.0
 
     # 调整本地时间以获得真太阳时(ephem通常已经考虑光行差)
-    true_solar_time = date_local + timedelta(hours=time_diff)
+    true_solar_time = 观测日期 + timedelta(hours=time_diff)
     return true_solar_time
 
 
 def 计算年干支_年柱(
-        date: datetime,
-        observer_latitude: Union[str, float,int]=0,
-        observer_longitude: Union[str, float,int]=0) -> str:
-    # 2000年立春时间
-    startDate = datetime(2000, 2, 4, 20, 40, 24)  
+        观测日期: datetime,
+        观测纬度: Union[str, float,int]=0,
+        观测经度: Union[str, float,int]=0) -> str:
+    """
+    计算指定经纬度在特定时间的年干支。
 
-    #如果指定了站点则计算真太阳时间:
-    if observer_latitude != 0 or observer_longitude != 0 : 
-        date = 计算本地经纬度的真太阳时(date,observer_latitude,observer_longitude)
-    diff_days = (date - startDate).days  # 计算指定日期与2000年2月4日之间的间隔天数
+    返回:
+    str: 指定时间的年干支，范围从"甲子"到"癸亥"。
+    """
+    # 参考 2000 年立春时间: 2000年是庚辰年
+    参考日期 = datetime(2000, 2, 4, 20, 40, 24)  
 
-    # 回归年的长度：365.24218968 - 0.0000000616*(t-2000)
-    day_per_year = 365.24218968 - 0.0000000616 * (diff_days / 365.24218968 / 2)  # 回归年的平均长度
-    years = math.floor(diff_days / day_per_year)  #算指定日期与2000年2月4日之间的年数
+    # 如已指定经纬度，则计算真太阳时:
+    if 观测纬度 != 0 or 观测经度 != 0 : 
+        观测日期 = 计算本地经纬度的真太阳时(观测日期, 观测纬度, 观测经度)
+    后推天数 = (观测日期 - 参考日期).days  # 计算指定日期与 2000 年 2 月 4 日之间的间隔天数
+
+    # 回归年的长度: 365.24218968 - 0.0000000616*(t-2000)
+    年均天数 = 365.24218968 - 0.0000000616 * (后推天数 / 365.24218968 / 2)  # 回归年的平均长度
+    后推年数 = math.floor(后推天数 / 年均天数)  #算指定日期与2000年2月4日之间的年数
 
     # 2000年是庚辰年
-    gan_index = (years + 6) % 10  # 加6位
-    zhi_index = (years + 4) % 12  # 加4位
-    gan_zhi = 天干[gan_index] + 地支[zhi_index]
-    return gan_zhi
+    天干地支 = 天干[(后推年数 + 6) % 10] + 地支[(后推年数 + 4) % 12]
+    return 天干地支
 
 
 def 计算月干支_月柱(
-        date: datetime,
-        latitude: Union[str, float]=39.90000, 
-        longitude: Union[str, float]=116.40000)-> str:
+        观测日期: datetime,
+        观测纬度: Union[str, float]=39.90000, 
+        观测经度: Union[str, float]=116.40000)-> str:
     """
-    计算指定站点在特定时间的月干支。
-
-    参数:
-    date (datetime): 观察时间
-    latitude (str): 观测者的纬度，以度为单位。
-    longitude (str): 观测者的经度，以度为单位。
+    计算指定经纬度在特定时间的月干支。
 
     返回:
-    str
-        指定时间的月干支，范围从"甲子"到"癸亥"。
+    str: 指定时间的月干支，范围从"甲子"到"癸亥"。
     """
     # 创建观察者的地球位置对象
     observer = ephem.Observer()
-    observer.lat, observer.lon = ephem.degrees(str(latitude)), ephem.degrees(str(longitude))  # 纬度，经度,需要转换为弧度
+    observer.lat, observer.lon = ephem.degrees(str(观测纬度)), ephem.degrees(str(观测经度))  # 纬度，经度,需要转换为弧度
 
     # 计算当前时区偏移hour_difference
-    hour_difference = 获取当前地点的时区偏移() 
+    时区偏移 = 获取当前地点的时区偏移() 
 
     # 解析日期字符串
-    date_local = date
-    date_0 = date_local - timedelta(hours=hour_difference)# 将本地时间转换为UTC+0时间
-    date = ephem.Date(date_0)
+    观测日期 = 观测日期
+    观测日期 = ephem.Date(观测日期 - timedelta(hours=时区偏移))  # 将本地观测日期转换为 UTC+0 时间
     
     # 创建观察者对象
-    observer.date = date
+    observer.date = 观测日期
     sun = ephem.Sun(observer)
     
     # 获取太阳的视黄经 (转换为度) :
-    # 求太阳的视赤经视赤纬 (epoch 设为所求时间就是视赤经视赤纬) 
-    equ = ephem.Equatorial(sun.ra, sun.dec, epoch=date)  
+    # 求太阳的视赤经&视赤纬 (epoch 设为所求时间就是视赤经&视赤纬) 
+    equ = ephem.Equatorial(sun.ra, sun.dec, epoch=观测日期)  
     
-    # 赤经赤纬转到黄经黄纬
-    ecl_v = ephem.Ecliptic(equ) 
-    
-    # 对视黄经进行修正为 0 到 360 度的范围
-    solar_longitude = (float(ecl_v.lon) * 180.0 / ephem.pi) % 360.0 
+    # 赤经赤纬转到黄经黄纬，对视黄经修正到 0 到 360 度的范围
+    黄道经度 = (float(ephem.Ecliptic(equ).lon) * 180.0 / ephem.pi) % 360.0 
     
     # 己卯月始于3月5日 14:42:40惊蛰
-    start_date = datetime(2000, 3, 5, 14, 42, 40)  
-    diff_days = (date_local - start_date).days
-    day_per_moon = (365.24218968 - 0.0000000616 * (diff_days / 365.24218968 / 2)) / 12
+    参考日期 = datetime(2000, 3, 5, 14, 42, 40)  
+    后推天数 = (观测日期 - 参考日期).days
     
     # 从己卯月开始的第几个月
-    moon_num = int(diff_days / day_per_moon)  
+    月均天数 = (365.24218968 - 0.0000000616 * (后推天数 / 365.24218968 / 2)) / 12
+    后推月数 = int(后推天数 / 月均天数)  
     
     # 推算月支与黄经的对应关系
-    solar_longitude_mi = (int(((solar_longitude - 15) % 360) / 30.0) + 4) % 12  
+    精确地支序号 = (int(((黄道经度 - 15) % 360) / 30.0) + 4) % 12  
     
     # 月支序数
-    moon_num_id =  (moon_num + 3) % 12  
+    近似月支序数 = (后推月数 + 3) % 12  
     
-    # 修正增量值(t12_diff)=精确地支序号(solar_longitude_mi)-近似地支序号(moon_num_id)
-    t12_diff = (solar_longitude_mi - moon_num_id + 12) % 12 
+    # 修正增量值(t12_diff) = 精确地支序号(solar_longitude_mi) - 近似地支序号(moon_num_id)
+    地支修正偏移 = (精确地支序号 - 近似月支序数 + 12) % 12 
     
-    # 修正：当 solar_longitude_mi 和 moon_num_id 分别居于头尾的偏差
-    # 如果 t12_diff 大于等于 6，表示实际差值应为负数，因此再减去 12
-    if t12_diff >= 6:
-        t12_diff -= 12
-    moon_num += t12_diff # 月支序数修正
-    gan_index = (moon_num + 5) % 10  # 加5位
-    zhi_index = (moon_num + 3) % 12  # 加3位
-    gan = 天干[gan_index]  # 天干序列获取
-    zhi = 地支[zhi_index]   # 地支序列获取
-    return gan + zhi  # 返回月干支
+    # 月干支值域修正: 偏移只有 -6 ~ +6
+    后推月数 += 地支修正偏移 if 地支修正偏移 < 6 else 地支修正偏移 - 12 # 月支序数修正
+    天干 = 天干[(后推月数 + 5) % 10]  # 天干序列获取
+    地支 = 地支[(后推月数 + 3) % 12]   # 地支序列获取
+    return 天干 + 地支  # 返回月干支
 
 
 def 计算日干支_日柱(
-        date_local: datetime,
-        observer_latitude: Union[str, float]=39.90000,
-        observer_longitude: Union[str, float]=116.40000) -> str:
+        观测日期: datetime,
+        观测纬度: Union[str, float]=39.90000,
+        观测经度: Union[str, float]=116.40000) -> str:
     """
-    参数:
-    date (datetime): 观察时间
-    latitude (str): 观测者的纬度，以度为单位。
-    longitude (str): 观测者的经度，以度为单位。
+    计算指定经纬度在特定时间的日干支。
+
+    返回:
+    str: 指定时间的日干支，范围从"甲子"到"癸亥"。
     """
-    # 日的分隔点是真太阳时 00:00:00
-    start_date = datetime(1900, 1, 1, 0, 0, 0, 0)  
+    # 参考 1900 年 1 月 1 日是甲戌日: 日的分隔点是真太阳时 00:00:00
+    参考时间 = datetime(1900, 1, 1, 0, 0, 0, 0)  
 
-    # 根据观测者的经纬度和时间，计算真太阳时(ephem通常已经考虑光行差):
-    true_solar_time = 计算本地经纬度的真太阳时(date_local,observer_latitude,observer_longitude)
-    difference_in_days = (true_solar_time - start_date).days
+    # 根据观测者的经纬度和时间，计算真太阳时 (ephem通常已经考虑光行差):
+    真太阳时 = 计算本地经纬度的真太阳时(观测日期, 观测纬度, 观测经度)
+    后推天数 = (真太阳时 - 参考时间).days
 
-	# 1900年1月1日是甲戌日:
-    gan_index = (difference_in_days + 0) % 10  # 加0位
-    zhi_index = (difference_in_days + 10) % 12  # 加10位
-    gan_zhi = 天干[gan_index] + 地支[zhi_index]
-    return gan_zhi
+	# 基于参考日期后推天干地支下标
+    天干地支 = 天干[(后推天数 + 0) % 10] + 地支[(后推天数 + 10) % 12]
+    return 天干地支
 
 
 def 计算时干支_时柱(
-        date_local: datetime,
-        observer_latitude: Union[str, float]=39.90000,
-        observer_longitude: Union[str, float]=116.40000) -> str:
+        观测日期: datetime,
+        观测纬度: Union[str, float]=39.90000,
+        观测经度: Union[str, float]=116.40000) -> str:
     """
-    根据观测者的经纬度和时间，计算真太阳时。
+    计算指定经纬度在特定时间的时干支。
 
-    参数:
-    date (datetime): 观察时间
-    latitude (str): 观测者的纬度，以度为单位。
-    longitude (str): 观测者的经度，以度为单位。
-
-    返回：
-    datetime: 调整后的真太阳时，已考虑观测者的经纬度和时区偏移量。
+    返回:
+    str: 指定时间的时干支，范围从"甲子"到"癸亥"。
     """
     # 根据观测者的经纬度和时间，计算真太阳时 (ephem通常已经考虑光行差):  
-    true_solar_time = 计算本地经纬度的真太阳时(date_local,observer_latitude,observer_longitude)
+    真太阳时 = 计算本地经纬度的真太阳时(观测日期, 观测纬度, 观测经度)
     
-    # 甲子月 甲申日 甲子时 作为真太阳时起始点
-    start_time_period = datetime(1983, 12, 21, 23, 42, 15)  
+    # 参考 1983-12-21 23:42:15 是甲子时: 甲子月 甲申日 甲子时 作为真太阳时起始点，子时的起点是真太阳时 23:00:00
+    参考时辰 = datetime(1983, 12, 21, 23, 42, 15)  
      
     # 已经过去多少个时辰
-    total_time_periods = round((true_solar_time - start_time_period).total_seconds() / 3600.0/ 2.0)
+    后推时辰数 = round((真太阳时 - 参考时辰).total_seconds() / 3600.0 / 2.0)
     
-    # 子时的起点是真太阳时23:00:00
-    total_time_correction = ((((true_solar_time.hour + 1) // 2 - total_time_periods) % 12) + 12) % 12 
-    if total_time_correction >= 6:
-        total_time_correction -= 12
-    total_time_periods += total_time_correction
+    # 时干支值域修正: 偏移只有 -6 ~ +6
+    时干支修正偏移 = ((((真太阳时.hour + 1) // 2 - 后推时辰数) % 12) + 12) % 12 
+    后推时辰数 += 时干支修正偏移 if 时干支修正偏移 < 6 else 时干支修正偏移 - 12
 
-	# 1983-12-21 23:42:15 是甲子时:
-    gan_index = (total_time_periods + 0) % 10  # 加0位
-    zhi_index = (total_time_periods + 0) % 12  # 加0位
-    gan_zhi = 天干[gan_index] + 地支[zhi_index]
-    return gan_zhi
+	# 基于参考日期后推天干地支下标
+    天干地支 = 天干[(后推时辰数 + 0) % 10] + 地支[(后推时辰数 + 0) % 12]
+    return 天干地支
 
 
 if __name__ == "__main__":
-    观测时间 = '1994-05-04 11:30:00'  # 示例时间
-
+    观测时间 = '2000-01-01 01:01:01'  # 示例时间
     经纬度 = '116.40000,39.90000'  # 北京市东城区
-    # 经纬度 = '114.328710,29.827230'  # 	湖北省咸宁市咸安区
 
     观测经度, 观测纬度 = 经纬度.split(',')
-    时间 = datetime.strptime(观测时间, '%Y-%m-%d %H:%M:%S')
-    年干支 = 计算年干支_年柱(时间, 观测纬度, 观测经度)
-    月干支 = 计算月干支_月柱(时间, 观测纬度, 观测经度)
-    日干支 = 计算日干支_日柱(时间, 观测纬度, 观测经度)
-    时干支 = 计算时干支_时柱(时间, 观测纬度, 观测经度)
+    观测日期 = datetime.strptime(观测时间, '%Y-%m-%d %H:%M:%S')
+    年干支 = 计算年干支_年柱(观测日期, 观测纬度, 观测经度)
+    月干支 = 计算月干支_月柱(观测日期, 观测纬度, 观测经度)
+    日干支 = 计算日干支_日柱(观测日期, 观测纬度, 观测经度)
+    时干支 = 计算时干支_时柱(观测日期, 观测纬度, 观测经度)
     
     print("经纬度: ", 经纬度)
     print(观测时间 + " 对应的年柱: " + 年干支)
